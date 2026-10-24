@@ -1,0 +1,35 @@
+ifndef PS5_PAYLOAD_SDK
+$(error Set PS5_PAYLOAD_SDK to the installed ps5-payload-sdk directory)
+endif
+
+THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
+
+ROOT_DIR := $(abspath $(dir $(THIS_MAKEFILE)))
+BUILD_DIR := $(ROOT_DIR)/out/build/ps5
+TARGET := $(BUILD_DIR)/dsf_info.elf
+DSDIFF_OBJECT := $(BUILD_DIR)/dsdiff_parser.o
+AUDIO_OBJECT := $(BUILD_DIR)/dsd_to_pcm.o
+
+CXXFLAGS := -std=c++23 -O2 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow
+CPPFLAGS := -I$(ROOT_DIR)/include
+SOURCES := $(ROOT_DIR)/src/ps5/dsf_info.cpp $(ROOT_DIR)/src/formats/dsf/parser.cpp
+
+.PHONY: all clean
+
+all: $(TARGET) $(DSDIFF_OBJECT) $(AUDIO_OBJECT)
+
+$(TARGET): $(SOURCES)
+	mkdir -p "$(BUILD_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o "$@" $(SOURCES)
+
+$(DSDIFF_OBJECT): $(ROOT_DIR)/src/formats/dsdiff/parser.cpp
+	mkdir -p "$(BUILD_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o "$@" "$<"
+
+$(AUDIO_OBJECT): $(ROOT_DIR)/src/audio/dsd_to_pcm.cpp
+	mkdir -p "$(BUILD_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o "$@" "$<"
+
+clean:
+	rm -f "$(TARGET)" "$(DSDIFF_OBJECT)" "$(AUDIO_OBJECT)"
