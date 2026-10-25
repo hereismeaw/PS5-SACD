@@ -42,6 +42,15 @@ target_include_directories(sacd_dsdiff
 )
 target_link_libraries(sacd_dsdiff PRIVATE ps5_sacd_host_warnings)
 
+add_library(sacd_iso
+    src/formats/sacd_iso/parser.cpp
+)
+target_include_directories(sacd_iso
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(sacd_iso PRIVATE ps5_sacd_host_warnings)
+
 add_library(sacd_audio
     src/audio/dsd_to_pcm.cpp
 )
@@ -80,6 +89,12 @@ if(BUILD_TESTING)
     )
     target_link_libraries(dsdiff_parser_tests PRIVATE sacd_dsdiff ps5_sacd_host_warnings)
     add_test(NAME dsdiff_parser_tests COMMAND dsdiff_parser_tests)
+
+    add_executable(sacd_iso_parser_tests
+        tests/sacd_iso/parser_tests.cpp
+    )
+    target_link_libraries(sacd_iso_parser_tests PRIVATE sacd_iso ps5_sacd_host_warnings)
+    add_test(NAME sacd_iso_parser_tests COMMAND sacd_iso_parser_tests)
 
     add_executable(dsd_to_pcm_tests
         tests/audio/dsd_to_pcm_tests.cpp
