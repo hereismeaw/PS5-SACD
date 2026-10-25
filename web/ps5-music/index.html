@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090b14">
+  <meta name="description" content="A focused, lossless music room for PS5-SACD.">
+  <title>PS5-SACD — Music Room</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="PS5-SACD home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="16" stroke="currentColor" stroke-width="1.4" />
+            <circle cx="20" cy="20" r="10" stroke="currentColor" stroke-opacity=".58" />
+            <circle cx="20" cy="20" r="3" fill="currentColor" />
+            <path d="M20 4a16 16 0 0 1 15.4 11.7" stroke="#8CF3E2" stroke-width="2.4" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span class="brand-copy"><strong>PS5-SACD</strong><small>LISTEN IN FULL</small></span>
+      </a>
+
+      <div class="topbar-center"><span class="live-dot"></span><span>YOUR PRIVATE LISTENING ROOM</span></div>
+
+      <div class="connection-pill" id="connectionStatus" role="status" aria-live="polite">
+        <span class="connection-dot"></span><span id="connectionLabel">CONNECTING</span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <nav class="sidebar" aria-label="Main navigation">
+        <div class="nav-label">SPACE</div>
+        <button class="nav-item active" type="button" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" /></svg>
+          <span>Listen now</span><i></i>
+        </button>
+        <button class="nav-item" id="libraryNav" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H20v16H7.5A2.5 2.5 0 0 0 5 21zM5 5.5v13A2.5 2.5 0 0 1 7.5 16H20" /></svg>
+          <span>Your library</span>
+        </button>
+
+        <div class="sidebar-divider"></div>
+        <div class="nav-label">SOURCE</div>
+        <div class="source-card">
+          <span class="source-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21zM4 5.5v13A2.5 2.5 0 0 1 6.5 16H20" /></svg>
+          </span>
+          <span><b>WAV Library</b><small id="libraryCount">Waiting for library</small></span>
+          <span class="source-led"></span>
+        </div>
+
+        <div class="sidebar-bottom">
+          <div class="quality-badge"><span class="quality-spark">✦</span><span><b>LOSSLESS PATH</b><small>PCM over your LAN</small></span></div>
+          <p>DSD stays pristine.<br>Playback stays simple.</p>
+        </div>
+      </nav>
+
+      <main class="main-content" id="home">
+        <section class="hero-card" aria-labelledby="heroTitle">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-line"></span>THE SACD LISTENING ROOM</div>
+            <h1 id="heroTitle">Sound, <em>unfolded.</em></h1>
+            <p>A calm space for the records that deserve your full attention.</p>
+            <div class="hero-actions">
+              <button class="primary-button" id="playCollection" type="button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z" /></svg>
+                <span>Play collection</span>
+              </button>
+              <button class="quiet-button" id="refreshLibrary" type="button" title="Refresh library">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 9a7 7 0 0 1 11.5-2L20 9M4 15l2.5 2A7 7 0 0 0 18 15" /></svg>
+                <span>Refresh library</span>
+              </button>
+            </div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="art-halo"></div>
+            <div class="art-orbit orbit-one"></div>
+            <div class="art-orbit orbit-two"></div>
+            <div class="hero-disc"><div class="disc-groove"></div><div class="disc-label"><span>PS</span><i>✦</i></div></div>
+            <div class="art-caption"><span>01 / 01</span><span>PURE SIGNAL</span></div>
+          </div>
+          <div class="hero-index"><span>01</span><i></i><span>ROOM</span></div>
+        </section>
+
+        <section class="collection-heading" id="library" aria-labelledby="collectionTitle">
+          <div>
+            <div class="eyebrow muted"><span class="eyebrow-line"></span>CURATED BY YOU</div>
+            <h2 id="collectionTitle">Your collection <span id="trackCount">—</span></h2>
+          </div>
+          <label class="search-box" for="searchTracks">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4 4" /></svg>
+            <input id="searchTracks" type="search" placeholder="Find a track" autocomplete="off">
+            <kbd>/</kbd>
+          </label>
+        </section>
+
+        <section class="library-layout" aria-label="Music library and queue">
+          <div class="track-panel">
+            <div class="track-table-head">
+              <span class="col-index">#</span><span class="col-title">TITLE</span><span class="col-format">FORMAT</span><span class="col-duration">TIME</span>
+            </div>
+            <div id="trackList" class="track-list" aria-label="Tracks"></div>
+            <div id="emptyState" class="empty-state">
+              <div class="empty-art"><div></div><span>✦</span></div>
+              <div class="empty-eyebrow">YOUR NEXT FAVORITE IS CLOSE</div>
+              <h3 id="emptyTitle">Your library is standing by.</h3>
+              <p id="emptyMessage">Add PCM WAV files to the shared folder on your computer, then refresh this room.</p>
+              <div class="empty-hint"><span class="hint-key">DSD</span><span>Convert with <code>dsd2wav</code> before playback.</span></div>
+            </div>
+          </div>
+
+          <aside class="queue-panel" aria-labelledby="queueTitle">
+            <div class="queue-heading"><div><div class="eyebrow muted">UP NEXT</div><h3 id="queueTitle">Your queue</h3></div><span class="queue-count" id="queueCount">0</span></div>
+            <div id="queueList" class="queue-list"></div>
+            <div class="queue-note"><span class="queue-note-icon">↗</span><p>Play a record to<br>build your queue.</p></div>
+            <div class="queue-footer"><span class="tiny-eq"><i></i><i></i><i></i><i></i></span><span>MADE FOR THE MOMENT</span></div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <footer class="player-bar" aria-label="Playback controls">
+      <div class="now-playing">
+        <div class="mini-cover" id="miniCover"><span>✦</span></div>
+        <div class="now-copy"><strong id="nowTitle">Nothing playing</strong><span id="nowArtist">Choose a WAV from your collection</span></div>
+        <span class="playing-quality" id="playingQuality">PCM</span>
+      </div>
+
+      <div class="transport">
+        <div class="transport-buttons">
+          <button class="icon-button minor" id="shuffleButton" type="button" aria-label="Shuffle" aria-pressed="false" title="Shuffle">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M4 4l5 5m3 3 2 2" /></svg>
+          </button>
+          <button class="icon-button" id="previousButton" type="button" aria-label="Previous track" title="Previous track">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 6l-9 6 9 6z" /></svg>
+          </button>
+          <button class="play-button" id="togglePlayback" type="button" aria-label="Play" title="Play">
+            <svg class="play-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z" /></svg>
+            <svg class="pause-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM15 5h3v14h-3z" /></svg>
+          </button>
+          <button class="icon-button" id="nextButton" type="button" aria-label="Next track" title="Next track">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 6l9 6-9 6z" /></svg>
+          </button>
+          <button class="icon-button minor" id="repeatButton" type="button" aria-label="Repeat off" aria-pressed="false" title="Repeat off">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 2 4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14-1v2a3 3 0 0 1-3 3H3" /></svg>
+          </button>
+        </div>
+        <div class="timeline">
+          <span id="elapsedTime">0:00</span>
+          <input id="seekSlider" type="range" min="0" max="1000" value="0" aria-label="Seek">
+          <span id="totalTime">0:00</span>
+        </div>
+      </div>
+
+      <div class="player-options">
+        <span class="output-label"><i></i>PS5 BROWSER</span>
+        <button class="icon-button volume-icon" id="muteButton" type="button" aria-label="Mute" title="Mute">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4zM17 9a5 5 0 0 1 0 6m2-9a9 9 0 0 1 0 12" /></svg>
+        </button>
+        <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="0.82" aria-label="Volume">
+      </div>
+    </footer>
+  </div>
+
+  <audio id="audioElement" preload="metadata"></audio>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

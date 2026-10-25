@@ -8,11 +8,17 @@ include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
 ROOT_DIR := $(abspath $(dir $(THIS_MAKEFILE)))
 BUILD_DIR := $(ROOT_DIR)/out/build/ps5
 TARGET := $(BUILD_DIR)/dsf_info.elf
+MUSIC_UI_TARGET := $(BUILD_DIR)/music_ui.elf
 DSDIFF_OBJECT := $(BUILD_DIR)/dsdiff_parser.o
 AUDIO_OBJECT := $(BUILD_DIR)/dsd_to_pcm.o
 ISO_OBJECT := $(BUILD_DIR)/sacd_iso_parser.o
 ISO_AUDIO_OBJECT := $(BUILD_DIR)/sacd_iso_audio_frames.o
 ISO_TEXT_OBJECT := $(BUILD_DIR)/sacd_iso_text.o
+ifndef PS5_MUSIC_UI_URL
+ifneq ($(MAKECMDGOALS),clean)
+$(error Set PS5_MUSIC_UI_URL to the library server URL reachable by the PS5)
+endif
+endif
 
 CXXFLAGS := -std=c++23 -O2 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow
 CPPFLAGS := -I$(ROOT_DIR)/include
@@ -20,11 +26,15 @@ SOURCES := $(ROOT_DIR)/src/ps5/dsf_info.cpp $(ROOT_DIR)/src/formats/dsf/parser.c
 
 .PHONY: all clean
 
-all: $(TARGET) $(DSDIFF_OBJECT) $(AUDIO_OBJECT) $(ISO_OBJECT) $(ISO_AUDIO_OBJECT) $(ISO_TEXT_OBJECT)
+all: $(TARGET) $(MUSIC_UI_TARGET) $(DSDIFF_OBJECT) $(AUDIO_OBJECT) $(ISO_OBJECT) $(ISO_AUDIO_OBJECT) $(ISO_TEXT_OBJECT)
 
 $(TARGET): $(SOURCES)
 	mkdir -p "$(BUILD_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o "$@" $(SOURCES)
+
+$(MUSIC_UI_TARGET): $(ROOT_DIR)/src/ps5/music_ui_launcher.c
+	mkdir -p "$(BUILD_DIR)"
+	$(CC) $(CPPFLAGS) -Wall -Wextra -Wpedantic -DPS5_MUSIC_UI_URL='"$(PS5_MUSIC_UI_URL)"' -o "$@" "$<" -lSceSystemService -lSceUserService
 
 $(DSDIFF_OBJECT): $(ROOT_DIR)/src/formats/dsdiff/parser.cpp
 	mkdir -p "$(BUILD_DIR)"
@@ -47,4 +57,4 @@ $(ISO_TEXT_OBJECT): $(ROOT_DIR)/src/formats/sacd_iso/text.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o "$@" "$<"
 
 clean:
-	rm -f "$(TARGET)" "$(DSDIFF_OBJECT)" "$(AUDIO_OBJECT)" "$(ISO_OBJECT)" "$(ISO_AUDIO_OBJECT)" "$(ISO_TEXT_OBJECT)"
+	rm -f "$(TARGET)" "$(MUSIC_UI_TARGET)" "$(DSDIFF_OBJECT)" "$(AUDIO_OBJECT)" "$(ISO_OBJECT)" "$(ISO_AUDIO_OBJECT)" "$(ISO_TEXT_OBJECT)"

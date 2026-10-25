@@ -39,13 +39,17 @@ reports DSF metadata.
 | `sacdextract` | Reassembles and extracts plain DSD64 tracks to DSDIFF for standard 2, 5, and 6 channel layouts. Audio bytes are copied losslessly. |
 | SACD image parser | Reads 2048-byte logical-sector master/area TOCs (including backup fallback), area attributes, and bounded `SACDTRL1` track extents. |
 | SACD-Text | `sacdinfo` decodes album/disc labels and common track credits from ISO-646 and ISO-8859-1 into UTF-8. |
-| PS5 build | Builds the DSF info payload and cross-compiles DSDIFF, FIR, SACD TOC, text, and uncompressed SACD sector parsing sources with the verified SDK compiler. |
+| PS5 build | Builds the DSF info payload and a PS5 Browser launcher for Music Room, and cross-compiles DSDIFF, FIR, SACD TOC, text, and uncompressed SACD sector parsing sources with the SDK compiler. |
+| PS5 Music Room | A controller-friendly, full-screen browser player for PCM WAV files served read-only from a computer on the same LAN. |
 
 ### Not implemented
 
 `DST` decoding, SACD-Text character sets ISO-8859-1-with-escape and the legacy
-Japanese/Korean/Chinese encodings, 2064-byte raw-sector dumps, and PS5 audio
-output are not implemented. ISO-646 and plain ISO-8859-1 labels are decoded;
+Japanese/Korean/Chinese encodings, 2064-byte raw-sector dumps, direct audio
+output from the native payload, and a signed PS5 home-screen title are not
+implemented. The Music Room plays host-converted PCM WAV through the PS5
+Browser; it does not decode DSD on the console. ISO-646 and plain ISO-8859-1
+labels are decoded;
 other character sets are reported as unsupported. `sacdextract` accepts raw
 2048-byte logical-sector images and extracts DSD64 frame formats 2/3 with
 standard 2/5/6 channel counts; other sample rates and channel counts are
@@ -110,14 +114,45 @@ its standard library were checked for C++23 `<expected>` support before the
 PS5 build was enabled.
 
 ```powershell
-.\tools\ps5\build-windows.ps1 -SdkPath 'C:\path\to\ps5-payload-sdk'
+.\tools\ps5\build-windows.ps1 `
+  -SdkPath 'C:\path\to\ps5-payload-sdk' `
+  -MusicUiUrl 'http://192.168.0.29:8765/'
 ```
 
-The build produces `out/build/ps5/dsf_info.elf` and compiles the DSDIFF parser,
-DSD-to-PCM source, SACD image/text parsers, and uncompressed audio-sector parser
-as PS5-target object files. The payload itself reports DSF metadata; it does not
-play audio or extract SACD tracks. The ELF is intended for a compatible payload
+Replace the example URL with the address printed by `serve.py`.
+
+The build produces `out/build/ps5/dsf_info.elf` and
+`out/build/ps5/music_ui.elf`, and compiles the DSDIFF parser, DSD-to-PCM source,
+SACD image/text parsers, and uncompressed audio-sector parser as PS5-target
+object files. `dsf_info.elf` reports DSF metadata. `music_ui.elf` opens the PS5
+Browser at the Music Room URL; both ELF files are for a compatible payload
 loader, not the PS5 home screen.
+
+### Open the PS5 Music Room
+
+Put PCM WAV files in a folder on the computer, then start the read-only library
+server. Keep the computer and PS5 on the same LAN, and use the computer's LAN IP
+address in the build command:
+
+```powershell
+python .\tools\ui\serve.py --library 'D:\Music'
+```
+
+The server prints a URL such as `http://192.168.0.29:8765/`. Build the launcher
+with that URL, then send `music_ui.elf` to a compatible payload loader while the
+server is running:
+
+```powershell
+.\tools\ps5\build-windows.ps1 `
+  -SdkPath 'C:\path\to\ps5-payload-sdk' `
+  -MusicUiUrl 'http://192.168.0.29:8765/'
+```
+
+The browser player supports play, pause, seeking, volume, search, queue, repeat,
+shuffle, keyboard input, and common controller buttons. Convert DSF/DSDIFF or
+extract a supported SACD track on the computer first, then put the resulting WAV
+in the shared folder. The library server only lists and streams WAV files; it
+does not modify them.
 
 ### Library use
 
@@ -161,13 +196,16 @@ PCM แบบ streaming และ payload ขนาดเล็กสำหร�
 | `sacdextract` | รวม packet และ extract plain DSD64 เป็น DSDIFF สำหรับ layout มาตรฐาน 2, 5 และ 6 channel โดยไม่เปลี่ยน audio bytes |
 | SACD image parser | อ่าน master/area TOC แบบ logical sector 2048-byte พร้อม backup fallback, metadata และ track extent จาก `SACDTRL1` ที่ตรวจขอบเขตแล้ว |
 | SACD-Text | `sacdinfo` ถอดรหัสชื่อ album/disc และเครดิต track จาก ISO-646 กับ ISO-8859-1 เป็น UTF-8 |
-| PS5 build | สร้าง payload อ่าน DSF metadata และ cross-compile source ของ DSDIFF, FIR, SACD TOC, text และ audio-sector parser ด้วย compiler ของ SDK ที่ตรวจแล้ว |
+| PS5 build | สร้าง payload อ่าน DSF metadata, launcher เปิด Music Room ใน PS5 Browser และ cross-compile source ของ DSDIFF, FIR, SACD TOC, text และ audio-sector parser ด้วย compiler ของ SDK |
+| PS5 Music Room | music player แบบเต็มจอและควบคุมด้วย controller สำหรับ PCM WAV ที่แชร์แบบอ่านอย่างเดียวจากคอมพิวเตอร์ใน LAN เดียวกัน |
 
 ### ส่วนที่ยังไม่รองรับ
 
 ยังไม่มี DST decoder, การถอด SACD-Text แบบ ISO-8859-1 ที่มี escape sequence
 หรือ charset เก่าในกลุ่ม Japanese/Korean/Chinese, raw-sector dump ขนาด
-2064-byte และการส่งเสียงออกทาง PS5 ปัจจุบันถอด ISO-646 และ ISO-8859-1 ปกติได้
+2064-byte และการส่งเสียงโดยตรงจาก native payload ยังไม่มีแอป PS5 ที่เปิดจากหน้า
+Home หรือผ่านการรับรอง ส่วน Music Room เล่น PCM WAV ที่แปลงจากคอมพิวเตอร์ผ่าน
+PS5 Browser; ยังไม่ได้ถอดรหัส DSD บนเครื่อง PS5 ปัจจุบันถอด ISO-646 และ ISO-8859-1 ปกติได้
 และจะแจ้ง charset อื่นว่าไม่รองรับ `sacdextract` รับ image แบบ logical sector
 2048-byte และ extract DSD64 frame format 2/3 สำหรับ layout มาตรฐาน 2/5/6 channel
 เท่านั้น sample rate หรือจำนวน channel แบบอื่นจะถูกปฏิเสธ ไฟล์ DSDIFF ที่ใช้ DST
@@ -226,13 +264,43 @@ area รองรับ plain DSD64 channel count 2, 5 และ 6 ตามล�
 library จริงว่ารองรับ C++23 `<expected>` ก่อนเปิดใช้ C++23 กับ PS5 build
 
 ```powershell
-.\tools\ps5\build-windows.ps1 -SdkPath 'C:\path\to\ps5-payload-sdk'
+.\tools\ps5\build-windows.ps1 `
+  -SdkPath 'C:\path\to\ps5-payload-sdk' `
+  -MusicUiUrl 'http://192.168.0.29:8765/'
 ```
 
-ผล build คือ `out/build/ps5/dsf_info.elf` พร้อม object files สำหรับ DSDIFF
-parser, DSD-to-PCM, SACD TOC/text และ parser ของ uncompressed audio sectors ตัว
-payload อ่าน DSF metadata เท่านั้น ยังไม่ได้เล่นเสียงหรือ extract SACD และ ELF นี้ใช้กับ payload loader
-ที่เข้ากันได้ ไม่ใช่แอปที่เปิดจากหน้า Home ของ PS5
+เปลี่ยน URL ตัวอย่างให้ตรงกับ URL ที่ `serve.py` แสดง
+
+ผล build คือ `out/build/ps5/dsf_info.elf` และ
+`out/build/ps5/music_ui.elf` พร้อม object files สำหรับ DSDIFF parser,
+DSD-to-PCM, SACD TOC/text และ parser ของ uncompressed audio sectors ไฟล์
+`dsf_info.elf` อ่าน DSF metadata ส่วน `music_ui.elf` เปิด PS5 Browser ไปยัง
+Music Room ทั้งสองไฟล์ใช้กับ payload loader ที่เข้ากันได้ ไม่ใช่แอปจากหน้า Home
+ของ PS5
+
+### เปิด PS5 Music Room
+
+วางไฟล์ PCM WAV ในโฟลเดอร์บนคอมพิวเตอร์ แล้วเปิด library server แบบอ่านอย่างเดียว
+ให้คอมพิวเตอร์และ PS5 อยู่ใน LAN เดียวกัน:
+
+```powershell
+python .\tools\ui\serve.py --library 'D:\Music'
+```
+
+server จะแสดง URL เช่น `http://192.168.0.29:8765/` นำ URL ของคอมพิวเตอร์ไปใส่
+ตอน build launcher จากนั้นส่ง `music_ui.elf` เข้า payload loader ที่รองรับขณะ
+server ยังทำงาน:
+
+```powershell
+.\tools\ps5\build-windows.ps1 `
+  -SdkPath 'C:\path\to\ps5-payload-sdk' `
+  -MusicUiUrl 'http://192.168.0.29:8765/'
+```
+
+player รองรับ play/pause, seek, volume, ค้นหา, queue, repeat, shuffle,
+คีย์บอร์ด และปุ่ม controller ทั่วไป ต้องแปลง DSF/DSDIFF หรือ extract track ที่
+รองรับบนคอมพิวเตอร์ก่อน แล้ววาง WAV ในโฟลเดอร์ที่แชร์ server จะแสดงและส่งเฉพาะ
+ไฟล์ WAV โดยไม่แก้ไขไฟล์ต้นฉบับ
 
 ### วิธีใช้ library
 
