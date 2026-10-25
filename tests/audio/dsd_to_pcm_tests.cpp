@@ -1,6 +1,7 @@
 #include "ps5_sacd/audio/dsd_to_pcm.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -103,6 +104,51 @@ bool test_bit_order_and_output_count() {
                  "processing after finish is rejected");
 }
 
+bool test_partial_final_byte() {
+    const std::array<std::byte, 1> msb_byte{std::byte{0x80}};
+    const std::array<std::byte, 1> lsb_byte{std::byte{0x01}};
+    auto msb = audio::DsdToPcmConverter::create(
+        kDsdRate, 44'100U, formats::DsdBitOrder::most_significant_bit_first);
+    auto lsb = audio::DsdToPcmConverter::create(
+        kDsdRate, 44'100U, formats::DsdBitOrder::least_significant_bit_first);
+    if (!check(msb.has_value() && lsb.has_value(), "partial-byte converters create")) {
+        return false;
+    }
+
+    auto msb_output = msb->process(msb_byte, 1U);
+    auto lsb_output = lsb->process(lsb_byte, 1U);
+    if (!check(msb_output.has_value() && lsb_output.has_value(), "one valid DSD bit is accepted")) {
+        return false;
+    }
+    auto msb_tail = msb->finish();
+    auto lsb_tail = lsb->finish();
+    if (!check(msb_tail.has_value() && lsb_tail.has_value(), "partial-byte streams flush")) {
+        return false;
+    }
+    append(*msb_output, std::move(*msb_tail));
+    append(*lsb_output, std::move(*lsb_tail));
+
+    if (!check(msb->input_sample_count() == 1U && lsb->input_sample_count() == 1U,
+               "padding bits are excluded from the DSD sample count")) {
+        return false;
+    }
+    if (!check(msb_output->size() == 1U && lsb_output->size() == 1U,
+               "partial-byte duration produces one PCM frame")) {
+        return false;
+    }
+    if (!check(std::abs(msb_output->front() - lsb_output->front()) < 1.0e-6F,
+               "partial-byte bit order selects the same logical sample")) {
+        return false;
+    }
+
+    auto invalid = audio::DsdToPcmConverter::create(
+        kDsdRate, 44'100U, formats::DsdBitOrder::most_significant_bit_first);
+    const auto rejected = invalid->process(msb_byte, 0U);
+    return check(!rejected
+                     && rejected.error().code == audio::ConversionErrorCode::invalid_final_byte_bit_count,
+                 "zero valid bits in a nonempty final byte are rejected");
+}
+
 bool test_chunked_streaming_matches_single_block() {
     Bytes dsd_bytes(4096U);
     for (std::size_t index = 0U; index < dsd_bytes.size(); ++index) {
@@ -200,6 +246,7 @@ bool test_low_pass_rejects_alternating_dsd() {
 int main() {
     const bool passed = test_rate_and_filter_validation()
         && test_bit_order_and_output_count()
+        && test_partial_final_byte()
         && test_chunked_streaming_matches_single_block()
         && test_low_pass_rejects_alternating_dsd();
     if (!passed) {

@@ -25,14 +25,15 @@ PS5 payload that reports DSF metadata.
 | DSF parser | Validates the container and exposes logical per-channel DSD bytes, preserving the file bit order. |
 | DSDIFF parser | Reads uncompressed `DSD ` data, sample rate, channel layout, and interleaved channel bytes. |
 | DSD → PCM | Stateful mono converter with a windowed-sinc Blackman FIR low-pass, rational output scheduling, and FIR tail flushing. |
+| `dsd2wav` | Converts DSF or uncompressed DSDIFF files to 24-bit PCM WAVE_FORMAT_EXTENSIBLE WAV. It maps documented DSF layouts and recognized DSDIFF stereo/LSCO layouts. |
 | PS5 build | Builds the DSF info payload and cross-compiles the DSDIFF parser and FIR conversion source with the verified SDK compiler. |
 
 ### Not implemented
 
-`DST` decoding, SACD ISO image parsing/extraction, multichannel orchestration,
-PS5 audio output, and a playable or signed PS5 title are not implemented. DSDIFF
-files using DST or another compression type are rejected as unsupported; they
-are never treated as decoded DSD.
+`DST` decoding, SACD ISO image parsing/extraction, speaker mapping for
+unrecognized multichannel layouts, PS5 audio output, and a playable or signed
+PS5 title are not implemented. DSDIFF files using DST or another compression
+type are rejected as unsupported; they are never treated as decoded DSD.
 
 ### Build and test on Windows
 
@@ -46,7 +47,25 @@ ctest --preset windows-debug
 
 The test suite covers DSF parsing, uncompressed DSDIFF parsing and channel
 layout, explicit DST rejection, DSD bit order, FIR filtering, and streaming
-results across different input chunk sizes.
+results across different input chunk sizes. End-to-end fixtures validate WAV
+headers and PCM data for both DSF and DSDIFF, including a partial DSF byte.
+
+### Convert a file to PCM WAV
+
+```powershell
+cmake --build --preset windows-debug
+.\out\build\windows-debug\dsd2wav.exe .\album.dsf .\album.wav
+.\out\build\windows-debug\dsd2wav.exe --rate 48000 .\album.dff .\album-48k.wav
+```
+
+The default PCM rate is 44.1 kHz for the 44.1 kHz DSD family and 48 kHz for the
+48 kHz family. Output uses 24-bit integer PCM. Stereo output is tagged as
+front-left/front-right, including stereo DSDIFF files whose CHNL identifiers
+give the reverse order. Documented DSF layouts and recognized DSDIFF 5.0/5.1
+layouts with `LSCO` are mapped to WAVE speakers. Other layouts retain source
+channel order with an unspecified speaker mask. The standard RIFF/WAVE 4 GiB
+size limit applies. The command refuses to overwrite an existing output file
+and publishes the result only after conversion finishes.
 
 ### Build the PS5 payload and core sources
 
@@ -90,12 +109,13 @@ PS5-SACD เป็นโปรเจกต์ C++ ระยะแรกสำห
 | DSF parser | ตรวจโครงสร้างไฟล์และอ่านข้อมูล DSD แยกตาม channel โดยรักษาลำดับบิตของไฟล์ |
 | DSDIFF parser | อ่านข้อมูล `DSD ` ที่ไม่บีบอัด, sample rate, channel layout และข้อมูล channel แบบ interleaved |
 | DSD → PCM | ตัวแปลง mono แบบมี state ใช้ windowed-sinc Blackman FIR low-pass, จัดตำแหน่ง output ตามอัตราสุ่ม และ flush FIR เมื่อจบข้อมูล |
+| `dsd2wav` | แปลงไฟล์ DSF หรือ DSDIFF แบบไม่บีบอัดเป็น WAV 24-bit PCM แบบ WAVE_FORMAT_EXTENSIBLE พร้อม map layout มาตรฐานของ DSF และ DSDIFF stereo/LSCO |
 | PS5 build | สร้าง payload อ่าน DSF metadata และ cross-compile source ของ DSDIFF กับ FIR converter ด้วย compiler ของ SDK ที่ตรวจแล้ว |
 
 ### ส่วนที่ยังไม่รองรับ
 
-ยังไม่มี DST decoder, การอ่านหรือ extract จาก SACD ISO, ตัวจัดการหลาย channel,
-การส่งเสียงออกทาง PS5 หรือเกม PS5 ที่เล่นได้และผ่านการเซ็นรับรอง ไฟล์ DSDIFF
+ยังไม่มี DST decoder, การอ่านหรือ extract จาก SACD ISO, การ map speaker สำหรับ
+layout หลาย channel ที่ไม่รู้จัก, การส่งเสียงออกทาง PS5 หรือเกม PS5 ที่เล่นได้และผ่านการเซ็นรับรอง ไฟล์ DSDIFF
 ที่ใช้ DST หรือ compression แบบอื่นจะถูกแจ้งว่าไม่รองรับ และจะไม่ถูกนับเป็น
 ข้อมูล DSD ที่ decode แล้ว
 
@@ -110,7 +130,23 @@ ctest --preset windows-debug
 ```
 
 ชุดทดสอบครอบคลุม DSF, DSDIFF แบบไม่บีบอัดและลำดับ channel, การปฏิเสธ DST,
-ลำดับบิต DSD, FIR filtering และผลลัพธ์ streaming เมื่อแบ่งข้อมูลเป็น block ต่างขนาดกัน
+ลำดับบิต DSD, FIR filtering, streaming ที่แบ่งเป็น block และ WAV header/PCM
+จาก fixtures ของทั้ง DSF และ DSDIFF รวมถึง byte สุดท้ายของ DSF ที่มี padding
+
+### แปลงไฟล์เป็น PCM WAV
+
+```powershell
+cmake --build --preset windows-debug
+.\out\build\windows-debug\dsd2wav.exe .\album.dsf .\album.wav
+.\out\build\windows-debug\dsd2wav.exe --rate 48000 .\album.dff .\album-48k.wav
+```
+
+ค่าเริ่มต้นคือ 44.1 kHz สำหรับ DSD ตระกูล 44.1 kHz และ 48 kHz สำหรับตระกูล
+48 kHz ไฟล์ output เป็น integer PCM 24-bit เสียง stereo ระบุ speaker เป็น
+front-left/front-right และจัด channel stereo ตาม CHNL ของ DSDIFF รวมถึง map
+layout 5.0/5.1 เมื่อมี LSCO ส่วน layout ที่ไม่รู้จักรักษาลำดับ channel ต้นฉบับ
+และระบุ speaker mask ว่าไม่กำหนด จำกัดขนาดไฟล์ตาม RIFF/WAVE ที่ 4 GiB และคำสั่งจะไม่
+เขียนทับ output ที่มีอยู่ โดยจะเผยแพร่ไฟล์เมื่อแปลงเสร็จเท่านั้น
 
 ### Build payload และ source สำหรับ PS5
 

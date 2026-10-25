@@ -20,6 +20,7 @@ constexpr std::array<char, 4> kSoundType{'S', 'N', 'D', ' '};
 constexpr std::array<char, 4> kSampleRateId{'F', 'S', ' ', ' '};
 constexpr std::array<char, 4> kChannelsId{'C', 'H', 'N', 'L'};
 constexpr std::array<char, 4> kCompressionId{'C', 'M', 'P', 'R'};
+constexpr std::array<char, 4> kLoudspeakerConfigurationId{'L', 'S', 'C', 'O'};
 constexpr std::array<char, 4> kDsdId{'D', 'S', 'D', ' '};
 constexpr std::array<char, 4> kDstId{'D', 'S', 'T', ' '};
 
@@ -33,6 +34,7 @@ struct Properties {
     std::optional<std::uint32_t> sample_rate_hz;
     std::optional<std::vector<ChannelId>> channel_ids;
     std::optional<ChannelId> compression_type;
+    std::optional<std::uint16_t> loudspeaker_configuration;
 };
 
 [[nodiscard]] std::uint8_t byte_at(
@@ -190,6 +192,14 @@ struct Properties {
                 return std::unexpected(ParseError{ErrorCode::invalid_compression, chunk.header_offset});
             }
             properties.compression_type = read_id(chunk.payload, 0U);
+        } else if (chunk.id == kLoudspeakerConfigurationId) {
+            if (properties.loudspeaker_configuration) {
+                return std::unexpected(ParseError{ErrorCode::duplicate_chunk, chunk.header_offset});
+            }
+            if (chunk.payload.size() != 2U) {
+                return std::unexpected(ParseError{ErrorCode::invalid_chunk_size, chunk.header_offset + 4U});
+            }
+            properties.loudspeaker_configuration = read_u16_be(chunk.payload, 0U);
         }
     }
 
@@ -348,6 +358,7 @@ std::expected<DsdiffFile, ParseError> parse(std::span<const std::byte> file) {
     result.sample_rate_hz = *properties.sample_rate_hz;
     result.sample_count_per_channel = static_cast<std::uint64_t>(bytes_per_channel) * 8U;
     result.channel_ids = std::move(*properties.channel_ids);
+    result.loudspeaker_configuration = properties.loudspeaker_configuration;
     result.audio_data = *audio_data;
     return result;
 }

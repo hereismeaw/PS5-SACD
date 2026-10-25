@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -17,6 +18,7 @@ using Bytes = std::vector<std::byte>;
 struct FixtureOptions {
     std::vector<dsdiff::ChannelId> channels{{'S', 'L', 'F', 'T'}, {'S', 'R', 'G', 'T'}};
     std::uint32_t sample_rate{2'822'400U};
+    std::optional<std::uint16_t> loudspeaker_configuration;
     dsdiff::ChannelId compression{'D', 'S', 'D', ' '};
     Bytes audio{std::byte{0x11}, std::byte{0x91}, std::byte{0x12}, std::byte{0x92}};
     bool unknown_top_chunk{};
@@ -87,6 +89,12 @@ Bytes make_properties(const FixtureOptions& options) {
         compression.push_back(static_cast<std::byte>(character));
     }
     append_chunk(properties, "CMPR", compression);
+
+    if (options.loudspeaker_configuration) {
+        Bytes loudspeaker_configuration;
+        append_u16_be(loudspeaker_configuration, *options.loudspeaker_configuration);
+        append_chunk(properties, "LSCO", loudspeaker_configuration);
+    }
 
     if (options.unknown_property_chunk) {
         append_chunk(properties, "ZZZZ", Bytes{std::byte{0x55}});
@@ -279,6 +287,18 @@ bool test_rate_layout_and_channel_bounds() {
                  "out-of-range channel offset rejected");
 }
 
+bool test_optional_loudspeaker_configuration() {
+    FixtureOptions options;
+    options.loudspeaker_configuration = 4U;
+    const auto bytes = make_fixture(options);
+    const auto parsed = dsdiff::parse(bytes);
+    if (!check(parsed.has_value(), "optional LSCO chunk parses")) {
+        return false;
+    }
+    return check(parsed->loudspeaker_configuration == 4U,
+                 "LSCO value is retained for speaker-aware WAV output");
+}
+
 } // namespace
 
 int main() {
@@ -287,7 +307,8 @@ int main() {
         && test_dst_is_reported_as_unsupported()
         && test_header_and_extent_errors()
         && test_required_order_and_fields()
-        && test_rate_layout_and_channel_bounds();
+        && test_rate_layout_and_channel_bounds()
+        && test_optional_loudspeaker_configuration();
     if (!passed) {
         return 1;
     }

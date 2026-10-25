@@ -51,6 +51,23 @@ target_include_directories(sacd_audio
 )
 target_link_libraries(sacd_audio PRIVATE ps5_sacd_host_warnings)
 
+add_library(sacd_wav
+    src/audio/dsd_to_wav.cpp
+)
+target_include_directories(sacd_wav
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(sacd_wav
+    PUBLIC sacd_dsf sacd_dsdiff sacd_audio
+    PRIVATE ps5_sacd_host_warnings
+)
+
+add_executable(dsd2wav
+    src/cli/dsd2wav.cpp
+)
+target_link_libraries(dsd2wav PRIVATE sacd_wav ps5_sacd_host_warnings)
+
 if(BUILD_TESTING)
     add_executable(dsf_parser_tests
         tests/dsf/parser_tests.cpp
@@ -69,4 +86,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(dsd_to_pcm_tests PRIVATE sacd_audio ps5_sacd_host_warnings)
     add_test(NAME dsd_to_pcm_tests COMMAND dsd_to_pcm_tests)
+
+    add_executable(dsd_to_wav_tests
+        tests/audio/dsd_to_wav_tests.cpp
+    )
+    target_link_libraries(dsd_to_wav_tests PRIVATE sacd_wav ps5_sacd_host_warnings)
+    add_test(NAME dsd_to_wav_tests COMMAND dsd_to_wav_tests)
+    add_test(NAME dsd2wav_help COMMAND dsd2wav --help)
 endif()

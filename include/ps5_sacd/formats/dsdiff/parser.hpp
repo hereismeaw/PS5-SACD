@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -49,6 +50,7 @@ struct DsdiffFile {
     std::uint32_t sample_rate_hz{};
     std::uint64_t sample_count_per_channel{};
     std::vector<ChannelId> channel_ids;
+    std::optional<std::uint16_t> loudspeaker_configuration;
     std::span<const std::byte> audio_data;
 
     [[nodiscard]] std::uint32_t channel_count() const noexcept {

@@ -135,19 +135,39 @@ std::expected<DsdToPcmConverter, ConversionError> DsdToPcmConverter::create(
 }
 
 std::expected<std::vector<float>, ConversionError> DsdToPcmConverter::process(
-    std::span<const std::byte> dsd_bytes) {
+    std::span<const std::byte> dsd_bytes,
+    std::uint8_t valid_bits_in_last_byte) {
     if (finished_) {
         return std::unexpected(ConversionError{ConversionErrorCode::converter_already_finished});
     }
-    if (dsd_bytes.size() > (std::numeric_limits<std::uint64_t>::max() - input_sample_count_) / 8U
-        || dsd_bytes.size() > (std::numeric_limits<std::uint64_t>::max() - processed_sample_count_) / 8U) {
+    if ((!dsd_bytes.empty() && (valid_bits_in_last_byte == 0U || valid_bits_in_last_byte > 8U))
+        || (dsd_bytes.empty() && valid_bits_in_last_byte != 8U)) {
+        return std::unexpected(ConversionError{ConversionErrorCode::invalid_final_byte_bit_count});
+    }
+
+    std::uint64_t valid_input_bits = 0U;
+    if (!dsd_bytes.empty()) {
+        const auto preceding_bytes = static_cast<std::uint64_t>(dsd_bytes.size() - 1U);
+        const auto maximum_preceding_bytes =
+            (std::numeric_limits<std::uint64_t>::max() - valid_bits_in_last_byte) / 8U;
+        if (preceding_bytes > maximum_preceding_bytes) {
+            return std::unexpected(ConversionError{ConversionErrorCode::sample_count_overflow});
+        }
+        valid_input_bits = preceding_bytes * 8U + valid_bits_in_last_byte;
+    }
+    if (valid_input_bits > std::numeric_limits<std::uint64_t>::max() - input_sample_count_
+        || valid_input_bits > std::numeric_limits<std::uint64_t>::max() - processed_sample_count_) {
         return std::unexpected(ConversionError{ConversionErrorCode::sample_count_overflow});
     }
 
     std::vector<float> output;
-    for (const auto byte : dsd_bytes) {
+    for (std::size_t byte_index = 0U; byte_index < dsd_bytes.size(); ++byte_index) {
+        const auto byte = dsd_bytes[byte_index];
         const auto value = std::to_integer<std::uint8_t>(byte);
-        for (unsigned int bit = 0U; bit < 8U; ++bit) {
+        const auto bit_count = byte_index + 1U == dsd_bytes.size()
+            ? valid_bits_in_last_byte
+            : 8U;
+        for (unsigned int bit = 0U; bit < bit_count; ++bit) {
             const auto shift = bit_order_ == formats::DsdBitOrder::most_significant_bit_first
                 ? 7U - bit
                 : bit;

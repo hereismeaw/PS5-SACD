@@ -17,6 +17,7 @@ enum class ConversionErrorCode {
     unsupported_rate_pair,
     invalid_filter_length,
     sample_count_overflow,
+    invalid_final_byte_bit_count,
     converter_already_finished,
 };
 
@@ -35,8 +36,11 @@ public:
         formats::DsdBitOrder bit_order,
         std::uint32_t filter_tap_count = 0U);
 
+    // Pass 1-8 when the block's final byte contains padding bits; the count
+    // follows the selected file bit order. Full-byte blocks use the default.
     [[nodiscard]] std::expected<std::vector<float>, ConversionError> process(
-        std::span<const std::byte> dsd_bytes);
+        std::span<const std::byte> dsd_bytes,
+        std::uint8_t valid_bits_in_last_byte = 8U);
 
     // Flushes the FIR delay line with zeroes and returns the remaining PCM
     // frames. The total output count is ceil(input_bits * pcm_rate / dsd_rate).
