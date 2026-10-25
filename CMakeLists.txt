@@ -42,8 +42,31 @@ target_include_directories(sacd_dsdiff
 )
 target_link_libraries(sacd_dsdiff PRIVATE ps5_sacd_host_warnings)
 
+add_library(sacd_dsdiff_writer
+    src/audio/dsdiff_writer.cpp
+)
+target_include_directories(sacd_dsdiff_writer
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(sacd_dsdiff_writer PRIVATE ps5_sacd_host_warnings)
+
+add_library(sacd_iso_extractor
+    src/formats/sacd_iso/extractor.cpp
+)
+target_include_directories(sacd_iso_extractor
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(sacd_iso_extractor
+    PUBLIC sacd_iso
+    PRIVATE sacd_dsdiff_writer ps5_sacd_host_warnings
+)
+
 add_library(sacd_iso
     src/formats/sacd_iso/parser.cpp
+    src/formats/sacd_iso/audio_frames.cpp
+    src/formats/sacd_iso/text.cpp
 )
 target_include_directories(sacd_iso
     PUBLIC
@@ -77,6 +100,16 @@ add_executable(dsd2wav
 )
 target_link_libraries(dsd2wav PRIVATE sacd_wav ps5_sacd_host_warnings)
 
+add_executable(sacdinfo
+    src/cli/sacdinfo.cpp
+)
+target_link_libraries(sacdinfo PRIVATE sacd_iso ps5_sacd_host_warnings)
+
+add_executable(sacdextract
+    src/cli/sacdextract.cpp
+)
+target_link_libraries(sacdextract PRIVATE sacd_iso_extractor ps5_sacd_host_warnings)
+
 if(BUILD_TESTING)
     add_executable(dsf_parser_tests
         tests/dsf/parser_tests.cpp
@@ -96,6 +129,26 @@ if(BUILD_TESTING)
     target_link_libraries(sacd_iso_parser_tests PRIVATE sacd_iso ps5_sacd_host_warnings)
     add_test(NAME sacd_iso_parser_tests COMMAND sacd_iso_parser_tests)
 
+    add_executable(sacd_iso_audio_frame_tests
+        tests/sacd_iso/audio_frames_tests.cpp
+    )
+    target_link_libraries(sacd_iso_audio_frame_tests PRIVATE sacd_iso ps5_sacd_host_warnings)
+    add_test(NAME sacd_iso_audio_frame_tests COMMAND sacd_iso_audio_frame_tests)
+
+    add_executable(dsdiff_writer_tests
+        tests/audio/dsdiff_writer_tests.cpp
+    )
+    target_link_libraries(dsdiff_writer_tests PRIVATE
+        sacd_dsdiff_writer sacd_dsdiff ps5_sacd_host_warnings)
+    add_test(NAME dsdiff_writer_tests COMMAND dsdiff_writer_tests)
+
+    add_executable(sacd_iso_extractor_tests
+        tests/sacd_iso/extractor_tests.cpp
+    )
+    target_link_libraries(sacd_iso_extractor_tests PRIVATE
+        sacd_iso_extractor sacd_dsdiff sacd_wav ps5_sacd_host_warnings)
+    add_test(NAME sacd_iso_extractor_tests COMMAND sacd_iso_extractor_tests)
+
     add_executable(dsd_to_pcm_tests
         tests/audio/dsd_to_pcm_tests.cpp
     )
@@ -108,4 +161,21 @@ if(BUILD_TESTING)
     target_link_libraries(dsd_to_wav_tests PRIVATE sacd_wav ps5_sacd_host_warnings)
     add_test(NAME dsd_to_wav_tests COMMAND dsd_to_wav_tests)
     add_test(NAME dsd2wav_help COMMAND dsd2wav --help)
+    add_test(NAME sacdinfo_help COMMAND sacdinfo --help)
+    add_test(NAME sacdextract_help COMMAND sacdextract --help)
+
+    set(SACD_CLI_FIXTURE_PATH "${CMAKE_CURRENT_BINARY_DIR}/sacd_cli_fixture.iso")
+    add_test(NAME sacd_cli_fixture
+        COMMAND sacd_iso_extractor_tests --make-fixture "${SACD_CLI_FIXTURE_PATH}")
+    set_tests_properties(sacd_cli_fixture PROPERTIES FIXTURES_SETUP sacd_cli_fixture_image)
+    add_test(NAME sacd_cli_end_to_end
+        COMMAND ${CMAKE_COMMAND}
+            "-DSACDINFO=$<TARGET_FILE:sacdinfo>"
+            "-DSACDEXTRACT=$<TARGET_FILE:sacdextract>"
+            "-DDSD2WAV=$<TARGET_FILE:dsd2wav>"
+            "-DINPUT=${SACD_CLI_FIXTURE_PATH}"
+            "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/sacd_cli_track.dff"
+            "-DWAV_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/sacd_cli_track.wav"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/sacd_cli_end_to_end.cmake")
+    set_tests_properties(sacd_cli_end_to_end PROPERTIES FIXTURES_REQUIRED sacd_cli_fixture_image)
 endif()

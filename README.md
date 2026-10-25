@@ -2,11 +2,19 @@
 
 # PS5-SACD
 
-### DSD tools, real DSD → PCM conversion, and SACD TOC parsing
+### DSD tools, real DSD → PCM conversion, and lossless SACD track extraction
 
-อ่าน metadata/ตำแหน่ง track จาก SACD image ได้ แปลง DSD เป็น PCM ด้วย FIR filter จริง และ build core สำหรับ PS5 SDK
+<p>
+  <img src="https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white" alt="C++23" />
+  <img src="https://img.shields.io/badge/Formats-DSF%20%7C%20DSDIFF%20%7C%20SACD-243447" alt="DSF, DSDIFF, SACD" />
+  <img src="https://img.shields.io/badge/Audio-1--bit%20DSD%20%7C%20PCM-7c3aed" alt="DSD and PCM audio" />
+</p>
 
-**C++23 · DSF · DSDIFF · SACD TOC · streaming FIR decimator · PS5 toolchain**
+**From SACD sectors to clean DSDIFF — and from DSD to PCM, with the bytes accounted for.**
+
+อ่าน metadata และตำแหน่ง track, extract plain DSD จาก SACD image เป็น DSDIFF, แปลง DSD เป็น PCM ด้วย FIR filter จริง และ build core สำหรับ PS5 SDK
+
+**C++23 · DSF · DSDIFF · SACD TOC + extraction · streaming FIR · PS5 toolchain**
 
 </div>
 
@@ -14,9 +22,10 @@
 
 ## English
 
-PS5-SACD is an early-stage C++ project for SACD/DSD format research. It provides
-host-side DSF, DSDIFF, and bounded SACD image metadata parsers, a streaming mono
-DSD-to-PCM conversion core, and a small PS5 payload that reports DSF metadata.
+PS5-SACD is a C++ project for SACD/DSD format research. It provides host-side
+DSF, DSDIFF, and SACD image parsers, a lossless extractor for plain DSD SACD
+tracks, a streaming DSD-to-PCM conversion core, and a small PS5 payload that
+reports DSF metadata.
 
 ### What works
 
@@ -26,18 +35,22 @@ DSD-to-PCM conversion core, and a small PS5 payload that reports DSF metadata.
 | DSDIFF parser | Reads uncompressed `DSD ` data, sample rate, channel layout, and interleaved channel bytes. |
 | DSD → PCM | Stateful mono converter with a windowed-sinc Blackman FIR low-pass, rational output scheduling, and FIR tail flushing. |
 | `dsd2wav` | Converts DSF or uncompressed DSDIFF files to 24-bit PCM WAVE_FORMAT_EXTENSIBLE WAV. It maps documented DSF layouts and recognized DSDIFF stereo/LSCO layouts. |
-| SACD image parser | Reads the 2048-byte logical-sector master TOC, stereo/multichannel area TOCs (including backup fallback), area attributes, and bounded `SACDTRL1` track extents. |
-| PS5 build | Builds the DSF info payload and cross-compiles the DSDIFF parser, FIR conversion source, and SACD image parser with the verified SDK compiler. |
+| `sacdinfo` | Reports logical-sector count, audio area properties, TOC selection, and verified track extents. |
+| `sacdextract` | Reassembles and extracts plain DSD64 tracks to DSDIFF for standard 2, 5, and 6 channel layouts. Audio bytes are copied losslessly. |
+| SACD image parser | Reads 2048-byte logical-sector master/area TOCs (including backup fallback), area attributes, and bounded `SACDTRL1` track extents. |
+| SACD-Text | `sacdinfo` decodes album/disc labels and common track credits from ISO-646 and ISO-8859-1 into UTF-8. |
+| PS5 build | Builds the DSF info payload and cross-compiles DSDIFF, FIR, SACD TOC, text, and uncompressed SACD sector parsing sources with the verified SDK compiler. |
 
 ### Not implemented
 
-`DST` decoding, audio-sector parsing/extraction from SACD images, SACD-Text
-string decoding, speaker mapping for unrecognized multichannel layouts, PS5
-audio output, and a playable or signed PS5 title are not implemented. The SACD
-parser accepts raw 2048-byte logical-sector images; 2064-byte raw-sector dumps
-are not supported. DSDIFF files using DST or another compression type are rejected
-as unsupported; they are never treated as decoded DSD. The SACD parser reports
-the stored frame-format code but does not decode DST or DSD audio.
+`DST` decoding, SACD-Text character sets ISO-8859-1-with-escape and the legacy
+Japanese/Korean/Chinese encodings, 2064-byte raw-sector dumps, and PS5 audio
+output are not implemented. ISO-646 and plain ISO-8859-1 labels are decoded;
+other character sets are reported as unsupported. `sacdextract` accepts raw
+2048-byte logical-sector images and extracts DSD64 frame formats 2/3 with
+standard 2/5/6 channel counts; other sample rates and channel counts are
+rejected. DSDIFF files using DST or another compression type are rejected as
+unsupported. A playable or signed PS5 title is outside the current payload build.
 
 ### Build and test on Windows
 
@@ -49,11 +62,12 @@ cmake --build --preset windows-debug
 ctest --preset windows-debug
 ```
 
-The test suite covers DSF parsing, uncompressed DSDIFF parsing and channel
-layout, SACD master/area TOCs and backup selection, safe track sector extents,
-explicit DST rejection, DSD bit order, FIR filtering, and streaming results
-across different input chunk sizes. End-to-end fixtures validate WAV headers
-and PCM data for both DSF and DSDIFF, including a partial DSF byte.
+The test suite covers DSF and DSDIFF parsing, SACD master/area TOCs and backup
+selection, SACD-Text offsets and ISO-8859-1 conversion, safe track extents,
+audio-sector packet reassembly, DST rejection, 2/5/6 channel DSDIFF extraction,
+DSD bit order, FIR filtering, and streaming across different input chunk sizes.
+End-to-end fixtures exercise `sacdinfo` → `sacdextract` → `dsd2wav` and validate
+WAV output for DSF and DSDIFF, including a partial DSF byte.
 
 ### Convert a file to PCM WAV
 
@@ -72,6 +86,22 @@ channel order with an unspecified speaker mask. The standard RIFF/WAVE 4 GiB
 size limit applies. The command refuses to overwrite an existing output file
 and publishes the result only after conversion finishes.
 
+### Inspect and extract a SACD track
+
+```powershell
+cmake --build --preset windows-debug
+.\out\build\windows-debug\sacdinfo.exe .\album.iso
+.\out\build\windows-debug\sacdextract.exe .\album.iso 1 .\track-01.dff
+.\out\build\windows-debug\sacdextract.exe --area multichannel .\album.iso 1 .\track-01-5.1.dff
+```
+
+Extraction defaults to the stereo area. Use `--area multichannel` for the
+multichannel area. The extractor supports uncompressed DSD64 in standard 2, 5,
+and 6 channel SACD order; the five and six channel mappings follow the published
+[SACD Audio Signal Properties](https://www.sonicstudio.com/pdf/dsd/SACD_SignalPropertiesV13.pdf).
+It rejects DST, other DSD rates, and nonstandard channel counts. The output is
+uncompressed DSDIFF, not PCM.
+
 ### Build the PS5 payload and core sources
 
 The Windows helper expects Git Bash, MinGW `g++`/`make`, LLVM 18–23, and an
@@ -84,9 +114,10 @@ PS5 build was enabled.
 ```
 
 The build produces `out/build/ps5/dsf_info.elf` and compiles the DSDIFF parser,
-DSD-to-PCM source, and SACD image parser as PS5-target object files. The payload
-itself reports DSF metadata; it does not play audio or parse SACD images. The
-ELF is intended for a compatible payload loader, not the PS5 home screen.
+DSD-to-PCM source, SACD image/text parsers, and uncompressed audio-sector parser
+as PS5-target object files. The payload itself reports DSF metadata; it does not
+play audio or extract SACD tracks. The ELF is intended for a compatible payload
+loader, not the PS5 home screen.
 
 ### Library use
 
@@ -97,6 +128,15 @@ order, then call `process()` for each byte block and `finish()` at end of
 stream. The parsed file is a non-owning view: keep its source bytes alive while
 reading from it.
 
+`extract_track_to_dsdiff` accepts an image byte span, selected audio area, track
+number, and seekable output stream. It parses only the selected track's sectors
+and returns an error for DST or unsupported formats instead of copying them as
+plain DSD.
+
+`parse_text` reads one language slot and returns UTF-8 metadata for ISO-646 or
+ISO-8859-1. It reports unsupported legacy encodings and malformed offsets as
+errors, so callers can keep showing the rest of the SACD report.
+
 The DSDIFF parser follows the public [DSDIFF 1.5 specification](https://www.sonicstudio.com/pdf/dsd/DSDIFF_1.5_Spec.pdf).
 The SACD TOC and track-list layout follows the public ScarletBook structures
 used by [SACD Ripper](https://github.com/hank/sacd-ripper/blob/master/libs/libsacd/scarletbook.h).
@@ -105,9 +145,9 @@ used by [SACD Ripper](https://github.com/hank/sacd-ripper/blob/master/libs/libsa
 
 ## ภาษาไทย
 
-PS5-SACD เป็นโปรเจกต์ C++ ระยะแรกสำหรับศึกษาไฟล์ SACD/DSD มี parser สำหรับ
-DSF, DSDIFF และ metadata ของ SACD image, แกนแปลง DSD เป็น PCM แบบ streaming
-และ payload ขนาดเล็กสำหรับอ่าน metadata ของ DSF บน PS5
+PS5-SACD เป็นโปรเจกต์ C++ สำหรับศึกษาไฟล์ SACD/DSD มี parser สำหรับ DSF,
+DSDIFF และ SACD image, ตัว extract plain DSD จาก SACD track, แกนแปลง DSD เป็น
+PCM แบบ streaming และ payload ขนาดเล็กสำหรับอ่าน metadata ของ DSF บน PS5
 
 ### ส่วนที่ทำงานได้แล้ว
 
@@ -117,18 +157,22 @@ DSF, DSDIFF และ metadata ของ SACD image, แกนแปลง DSD �
 | DSDIFF parser | อ่านข้อมูล `DSD ` ที่ไม่บีบอัด, sample rate, channel layout และข้อมูล channel แบบ interleaved |
 | DSD → PCM | ตัวแปลง mono แบบมี state ใช้ windowed-sinc Blackman FIR low-pass, จัดตำแหน่ง output ตามอัตราสุ่ม และ flush FIR เมื่อจบข้อมูล |
 | `dsd2wav` | แปลงไฟล์ DSF หรือ DSDIFF แบบไม่บีบอัดเป็น WAV 24-bit PCM แบบ WAVE_FORMAT_EXTENSIBLE พร้อม map layout มาตรฐานของ DSF และ DSDIFF stereo/LSCO |
-| SACD image parser | อ่าน master TOC แบบ logical sector 2048-byte, area TOC ของ stereo/multichannel พร้อม fallback ไปยัง backup, metadata ของ area และ track extent จาก `SACDTRL1` ที่ตรวจขอบเขตแล้ว |
-| PS5 build | สร้าง payload อ่าน DSF metadata และ cross-compile source ของ DSDIFF, FIR converter และ SACD image parser ด้วย compiler ของ SDK ที่ตรวจแล้ว |
+| `sacdinfo` | แสดงจำนวน logical sector, คุณสมบัติ audio area, TOC ที่เลือก และขอบเขต sector ของ track |
+| `sacdextract` | รวม packet และ extract plain DSD64 เป็น DSDIFF สำหรับ layout มาตรฐาน 2, 5 และ 6 channel โดยไม่เปลี่ยน audio bytes |
+| SACD image parser | อ่าน master/area TOC แบบ logical sector 2048-byte พร้อม backup fallback, metadata และ track extent จาก `SACDTRL1` ที่ตรวจขอบเขตแล้ว |
+| SACD-Text | `sacdinfo` ถอดรหัสชื่อ album/disc และเครดิต track จาก ISO-646 กับ ISO-8859-1 เป็น UTF-8 |
+| PS5 build | สร้าง payload อ่าน DSF metadata และ cross-compile source ของ DSDIFF, FIR, SACD TOC, text และ audio-sector parser ด้วย compiler ของ SDK ที่ตรวจแล้ว |
 
 ### ส่วนที่ยังไม่รองรับ
 
-ยังไม่มี DST decoder, การอ่านหรือ extract audio sectors จาก SACD image, การถอด
-ข้อความ SACD-Text, การ map speaker สำหรับ layout หลาย channel ที่ไม่รู้จัก,
-การส่งเสียงออกทาง PS5 หรือเกม PS5 ที่เล่นได้และผ่านการเซ็นรับรอง parser SACD
-รับเฉพาะ image ที่ใช้ logical sector 2048-byte และยังไม่รองรับ raw-sector dump
-ขนาด 2064-byte parser รายงาน frame-format code แต่ยังไม่ decode DST หรือ DSD
-ไฟล์ DSDIFF ที่ใช้ DST หรือ compression แบบอื่นจะถูกแจ้งว่าไม่รองรับ และจะไม่
-ถูกนับเป็นข้อมูล DSD ที่ decode แล้ว
+ยังไม่มี DST decoder, การถอด SACD-Text แบบ ISO-8859-1 ที่มี escape sequence
+หรือ charset เก่าในกลุ่ม Japanese/Korean/Chinese, raw-sector dump ขนาด
+2064-byte และการส่งเสียงออกทาง PS5 ปัจจุบันถอด ISO-646 และ ISO-8859-1 ปกติได้
+และจะแจ้ง charset อื่นว่าไม่รองรับ `sacdextract` รับ image แบบ logical sector
+2048-byte และ extract DSD64 frame format 2/3 สำหรับ layout มาตรฐาน 2/5/6 channel
+เท่านั้น sample rate หรือจำนวน channel แบบอื่นจะถูกปฏิเสธ ไฟล์ DSDIFF ที่ใช้ DST
+หรือ compression แบบอื่นจะถูกแจ้งว่าไม่รองรับ เกม PS5 ที่เล่นได้หรือผ่านการ
+เซ็นรับรองยังอยู่นอกขอบเขตของ payload ปัจจุบัน
 
 ### Build และทดสอบบน Windows
 
@@ -140,10 +184,10 @@ cmake --build --preset windows-debug
 ctest --preset windows-debug
 ```
 
-ชุดทดสอบครอบคลุม DSF, DSDIFF แบบไม่บีบอัดและลำดับ channel, master/area TOC
-ของ SACD, backup TOC, track sector extent ที่ปลอดภัย, การปฏิเสธ DST, ลำดับบิต
-DSD, FIR filtering, streaming ที่แบ่งเป็น block และ WAV header/PCM จาก fixtures
-ของทั้ง DSF และ DSDIFF รวมถึง byte สุดท้ายของ DSF ที่มี padding
+ชุดทดสอบครอบคลุม DSF/DSDIFF, master/area TOC และ backup, SACD-Text offsets และ
+การแปลง ISO-8859-1, track extent, packet reassembly, การปฏิเสธ DST, การ extract
+DSDIFF layout 2/5/6 channel, FIR/streaming และ WAV output จาก DSF/DSDIFF
+พร้อมทดสอบการทำงานต่อเนื่อง `sacdinfo` → `sacdextract` → `dsd2wav`
 
 ### แปลงไฟล์เป็น PCM WAV
 
@@ -160,6 +204,21 @@ layout 5.0/5.1 เมื่อมี LSCO ส่วน layout ที่ไม่
 และระบุ speaker mask ว่าไม่กำหนด จำกัดขนาดไฟล์ตาม RIFF/WAVE ที่ 4 GiB และคำสั่งจะไม่
 เขียนทับ output ที่มีอยู่ โดยจะเผยแพร่ไฟล์เมื่อแปลงเสร็จเท่านั้น
 
+### ตรวจข้อมูลและ extract track จาก SACD
+
+```powershell
+cmake --build --preset windows-debug
+.\out\build\windows-debug\sacdinfo.exe .\album.iso
+.\out\build\windows-debug\sacdextract.exe .\album.iso 1 .\track-01.dff
+.\out\build\windows-debug\sacdextract.exe --area multichannel .\album.iso 1 .\track-01-5.1.dff
+```
+
+ค่าเริ่มต้นใช้ stereo area; ระบุ `--area multichannel` เพื่อเลือก multichannel
+area รองรับ plain DSD64 channel count 2, 5 และ 6 ตามลำดับมาตรฐานที่ระบุใน
+[SACD Audio Signal Properties](https://www.sonicstudio.com/pdf/dsd/SACD_SignalPropertiesV13.pdf)
+ผลลัพธ์เป็น DSDIFF แบบไม่บีบอัด ไม่ใช่ PCM และ DST/อัตรา DSD หรือ channel layout
+อื่นจะถูกปฏิเสธอย่างชัดเจน
+
 ### Build payload และ source สำหรับ PS5
 
 สคริปต์ Windows ต้องใช้ Git Bash, MinGW `g++`/`make`, LLVM 18–23 และ
@@ -171,8 +230,8 @@ library จริงว่ารองรับ C++23 `<expected>` ก่อน�
 ```
 
 ผล build คือ `out/build/ps5/dsf_info.elf` พร้อม object files สำหรับ DSDIFF
-parser, DSD-to-PCM source และ SACD image parser ตัว payload อ่าน DSF metadata
-เท่านั้น ยังไม่ได้เล่นเสียงหรืออ่าน SACD image และ ELF นี้ใช้กับ payload loader
+parser, DSD-to-PCM, SACD TOC/text และ parser ของ uncompressed audio sectors ตัว
+payload อ่าน DSF metadata เท่านั้น ยังไม่ได้เล่นเสียงหรือ extract SACD และ ELF นี้ใช้กับ payload loader
 ที่เข้ากันได้ ไม่ใช่แอปที่เปิดจากหน้า Home ของ PS5
 
 ### วิธีใช้ library
@@ -183,10 +242,19 @@ parser, DSD-to-PCM source และ SACD image parser ตัว payload อ่�
 ให้ `process()` ต่อเนื่อง และเรียก `finish()` เมื่ออ่านจบ parser คืนค่าเป็น
 view ที่ไม่ถือครองหน่วยความจำ จึงต้องเก็บ buffer ต้นทางไว้จนกว่าจะอ่านเสร็จ
 
+`extract_track_to_dsdiff` รับ byte span ของ image, audio area, หมายเลข track
+และ output stream ที่ seek ได้ โดยอ่านเฉพาะ sector ของ track ที่เลือก และคืน
+ข้อผิดพลาดเมื่อพบ DST หรือ format ที่ไม่รองรับ แทนการเขียนข้อมูลนั้นเป็น DSD ดิบ
+
+`parse_text` อ่านภาษาใน slot ที่เลือกและคืน metadata UTF-8 สำหรับ ISO-646 หรือ
+ISO-8859-1 หากพบ charset เก่าหรือ offset ที่ผิดรูปแบบจะคืน error เพื่อให้ caller
+ยังแสดงข้อมูล SACD ส่วนอื่นต่อได้
+
 `ps5_sacd::formats::sacd_iso::parse` รับ byte span ของ SACD image ที่ใช้ sector
 2048-byte แล้วคืนค่า area attributes และ LSN/length ของ track แต่ละรายการ
 parser ตรวจ master/area TOC pointers และทุก track extent ให้อยู่ภายใน image
-และ audio area; ส่วนการอ่าน sector และแปลงเสียงยังไม่รวมอยู่ใน parser นี้
+ส่วน `AudioFrameAssembler` รวม packet ของ plain DSD frame และ extractor เขียน
+track ที่รองรับลง DSDIFF
 
 parser DSDIFF อ้างอิง [ข้อกำหนด DSDIFF 1.5](https://www.sonicstudio.com/pdf/dsd/DSDIFF_1.5_Spec.pdf)
 โครงสร้าง SACD TOC และ track list อ้างอิง ScarletBook structures ที่เผยแพร่ใน
